@@ -20,4 +20,5 @@ type UAASettings struct {
 	ClientID     string
 	ClientSecret string
 	VerifyCert   bool
+	Realm        string
 }

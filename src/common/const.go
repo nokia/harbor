@@ -130,6 +130,10 @@ const (
 	LDAPGroupType                     = 1
 	HTTPGroupType                     = 2
 	OIDCGroupType                     = 3
+
+	KeyCloakGroupType                 = 99
+        Realm                             = "realm"
+
 	LDAPGroupAdminDn                  = "ldap_group_admin_dn"
 	LDAPGroupMembershipAttribute      = "ldap_group_membership_attribute"
 	DefaultRegistryControllerEndpoint = "http://registryctl:8080"

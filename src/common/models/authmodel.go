@@ -18,4 +18,5 @@ package models
 type AuthModel struct {
 	Principal string
 	Password  string
+	Accesstoken     string
 }

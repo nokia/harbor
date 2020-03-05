@@ -34,6 +34,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security/local"
 	robotCtx "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/common/security/secret"
+	"github.com/goharbor/harbor/src/common/security/authsso"
 	"github.com/goharbor/harbor/src/common/utils/log"
 	"github.com/goharbor/harbor/src/core/auth"
 	"github.com/goharbor/harbor/src/core/config"
@@ -102,6 +103,30 @@ func Init() {
 			&tokenReqCtxModifier{},
 			&basicAuthReqCtxModifier{},
 			&unauthorizedReqCtxModifier{}}
+		return
+	}
+
+	if config.WithSSO() {
+	//	reqCtxModifiers = []ReqCtxModifier{
+	//		&secretReqCtxModifier{config.SecretStore},
+	//		&ssosessionReqCtxModifier{},
+	//		&ssoReqCtxModifier{},
+	//		&unauthorizedReqCtxModifier{}}
+
+
+            reqCtxModifiers = []ReqCtxModifier{
+                &configCtxModifier{},
+                &secretReqCtxModifier{config.SecretStore},
+		&ssosessionReqCtxModifier{},
+		&ssoReqCtxModifier{},
+                &oidcCliReqCtxModifier{},
+                &idTokenReqCtxModifier{},
+                &authProxyReqCtxModifier{},
+                &robotAuthReqCtxModifier{},
+                &basicAuthReqCtxModifier{},
+                &unauthorizedReqCtxModifier{}}
+
+
 		return
 	}
 
@@ -451,6 +476,77 @@ func (b *basicAuthReqCtxModifier) Modify(ctx *beegoctx.Context) bool {
 	return true
 }
 
+type ssoReqCtxModifier struct{}
+func (s *ssoReqCtxModifier) Modify(ctx *beegoctx.Context) bool {
+
+	authmodel := models.AuthModel{}
+	token_header := ctx.Request.Header.Get(authsso.AuthTokenHeader)
+	if len(token_header) > 0 {
+		if strings.HasPrefix(ctx.Request.URL.Path, "/v2/") == false {
+			token := strings.Split(token_header, " ")
+			if len(token) != 2 || token[0] != "Bearer" {
+				log.Debugf("it's not bearer token, ignore: length: %d", len(token))
+				if len(token) > 0 {
+					log.Debugf("ignored token first part: %s", token[0])
+				}
+			} else {
+				log.Debug("got bearer token from request")
+				authmodel.Accesstoken = token[1]
+			}
+		} else {
+			log.Debugf("bypass token for docker registry, which will be proxied out: %s", ctx.Request.URL.Path)
+		}
+	}
+
+	username, password, ok := ctx.Request.BasicAuth()
+	if ok {
+		authmodel.Principal = username
+		authmodel.Password = password
+	}
+	if len(authmodel.Principal) == 0 && len(authmodel.Accesstoken) == 0 {
+		log.Debug("sso authenticate: no username or token")
+		return false
+	}
+	// verify the user.
+	user, err := auth.Login(authmodel)
+	if err != nil {
+		log.Errorf("failed to authenticate %s: %v", username, err)
+		return false
+	}
+	if user == nil {
+		log.Debug("token auth user is nil")
+		return false
+	}
+	pm := config.GlobalProjectMgr
+	securCtx := authsso.NewSecurityContext(user, pm)
+	setSecurCtxAndPM(ctx.Request, securCtx, pm)
+	return true
+}
+type ssosessionReqCtxModifier struct{}
+
+func (s *ssosessionReqCtxModifier) Modify(ctx *beegoctx.Context) bool {
+	var user models.User
+	userInterface := ctx.Input.Session("user")
+
+	if userInterface == nil {
+		log.Debug("can not get user information from session")
+		return false
+	}
+
+	log.Debug("got user information from session")
+	user, ok := userInterface.(models.User)
+	if !ok {
+		log.Info("can not get user information from session")
+		return false
+	}
+	pm := config.GlobalProjectMgr
+	log.Debug("creating sso security context...")
+	securCtx := authsso.NewSecurityContext(&user, pm)
+	setSecurCtxAndPM(ctx.Request, securCtx, pm)
+
+	return true
+}
+
 type sessionReqCtxModifier struct{}
 
 func (s *sessionReqCtxModifier) Modify(ctx *beegoctx.Context) bool {
@@ -465,6 +561,7 @@ func (s *sessionReqCtxModifier) Modify(ctx *beegoctx.Context) bool {
 		log.Info("can not get user information from session")
 		return false
 	}
+	log.Debugf("Getting user %s", user.Username)
 	log.Debug("using local database project manager")
 	pm := config.GlobalProjectMgr
 	log.Debug("creating local database security context...")

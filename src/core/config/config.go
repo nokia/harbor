@@ -187,6 +187,21 @@ func AuthMode() (string, error) {
 	return cfgMgr.Get(common.AUTHMode).GetString(), nil
 }
 
+// SSO check...
+func WithSSO() (bool) {
+        err := cfgMgr.Load()
+        if err != nil {
+                log.Errorf("failed to load config, error %v", err)
+		return false
+        }
+
+	if ( (cfgMgr.Get(common.AUTHMode).GetString()) == common.UAAAuth && len(os.Getenv("REALM"))>0 ) {
+		return true
+	} else {
+		return false
+	}
+}
+
 // TokenPrivateKeyPath returns the path to the key for signing token for registry
 func TokenPrivateKeyPath() string {
 	path := os.Getenv("TOKEN_PRIVATE_KEY_PATH")
@@ -417,6 +432,8 @@ func UAASettings() (*models.UAASettings, error) {
 		ClientID:     cfgMgr.Get(common.UAAClientID).GetString(),
 		ClientSecret: cfgMgr.Get(common.UAAClientSecret).GetString(),
 		VerifyCert:   cfgMgr.Get(common.UAAVerifyCert).GetBool(),
+                //Realm:        cfgMgr.Get(common.Realm).GetString(),
+                Realm:        os.Getenv("REALM"),
 	}
 	return us, nil
 }

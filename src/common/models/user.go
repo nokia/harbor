@@ -43,6 +43,8 @@ type User struct {
 	UpdateTime   time.Time `orm:"column(update_time);auto_now" json:"update_time"`
 	GroupIDs     []int     `orm:"-" json:"-"`
 	OIDCUserMeta *OIDCUser `orm:"-" json:"oidc_user_meta,omitempty"`
+	GroupList    []*UserGroup `orm:"-" json:"-"`
+	SSORoleList  []string     `orm:"-" json:"-"`
 }
 
 // UserQuery ...

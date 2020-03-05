@@ -133,7 +133,7 @@ func Login(m models.AuthModel) (*models.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	if authMode == "" || dao.IsSuperUser(m.Principal) {
+	if authMode == "" || (len(m.Principal) > 0 && dao.IsSuperUser(m.Principal)) {
 		authMode = common.DBAuth
 	}
 	log.Debug("Current AUTH_MODE is ", authMode)
@@ -142,19 +142,20 @@ func Login(m models.AuthModel) (*models.User, error) {
 	if !ok {
 		return nil, fmt.Errorf("Unrecognized auth_mode: %s", authMode)
 	}
-	if lock.IsLocked(m.Principal) {
-		log.Debugf("%s is locked due to login failure, login failed", m.Principal)
+	if len(m.Principal) > 0 && lock.IsLocked(m.Principal) {
+		log.Infof("Login failed: %s is locked due to login failure", m.Principal)
 		return nil, nil
 	}
 	user, err := authenticator.Authenticate(m)
 	if err != nil {
 		if _, ok = err.(ErrAuth); ok {
-			log.Debugf("Login failed, locking %s, and sleep for %v", m.Principal, frozenTime)
+			log.Infof("Login failed: %s", m.Principal)
 			lock.Lock(m.Principal)
 			time.Sleep(frozenTime)
 		}
 		return nil, err
 	}
+        log.Infof("Login succeed: %s", user.Username)
 	err = authenticator.PostAuthenticate(user)
 	return user, err
 }

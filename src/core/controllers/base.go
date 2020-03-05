@@ -118,6 +118,12 @@ func (cc *CommonController) Login() {
 
 // LogOut Habor UI
 func (cc *CommonController) LogOut() {
+        sessionData := cc.GetSession("user")
+        if sessionData != nil {
+            log.Infof("Logout: %s", sessionData.(models.User).Username)
+        } else {
+            log.Info("Logout: session is gone already")
+        }
 	cc.DestroySession()
 }
 

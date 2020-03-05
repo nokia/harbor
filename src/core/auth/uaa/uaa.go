@@ -41,6 +41,25 @@ func (u *Auth) Authenticate(m models.AuthModel) (*models.User, error) {
 	if err := u.ensureClient(); err != nil {
 		return nil, err
 	}
+	if len(m.Principal) == 0 && len(m.Accesstoken) > 0 {
+		info, err := u.client.GetUserInfo(m.Accesstoken)
+		if err != nil {
+			log.Debugf("Failed to extract user info, error: %v", err)
+			return nil, auth.NewErrAuth(err.Error())
+		}
+		log.Debugf("Get User Infor: %v", info)
+		if len(info.UserName) ==0 {
+			return nil, auth.NewErrAuth("Can't find UserName")
+		}
+		user := &models.User{
+			Username: info.UserName,
+			Email: info.Email,
+			Realname: info.Name,
+			SSORoleList: info.SSORoleList,
+			GroupList: formatusergroup(info.GroupList),
+		}
+		return user, nil
+	}
 	t, err := u.client.PasswordAuth(m.Principal, m.Password)
 	if err != nil {
 		return nil, auth.NewErrAuth(err.Error())
@@ -54,8 +73,20 @@ func (u *Auth) Authenticate(m models.AuthModel) (*models.User, error) {
 	} else {
 		user.Email = info.Email
 		user.Realname = info.Name
+		user.SSORoleList = info.SSORoleList
+		user.GroupList = formatusergroup(info.GroupList)
 	}
 	return user, nil
+}
+
+// Format user group.
+func formatusergroup(grouplist []string) ( []* models.UserGroup) {
+	usergroup := make([]* models.UserGroup, len(grouplist))
+	for index, element := range grouplist {
+		usergroup[index] = & models.UserGroup{ GroupName : strings.Trim(element, "\\"), GroupType:common.KeyCloakGroupType }
+	}
+	return usergroup
+
 }
 
 // OnBoardUser will check if a user exists in user table, if not insert the user and
@@ -130,11 +161,12 @@ func (u *Auth) SearchUser(username string) (*models.User, error) {
 func (u *Auth) ensureClient() error {
 	var cfg *uaa.ClientConfig
 	UAASettings, err := config.UAASettings()
-	//	log.Debugf("Uaa settings: %+v", UAASettings)
+	log.Debugf("Uaa settings: %+v", UAASettings)
 	if err != nil {
 		log.Warningf("Failed to get UAA setting from Admin Server, error: %v", err)
 	} else {
 		cfg = &uaa.ClientConfig{
+                        Realm:         UAASettings.Realm,
 			ClientID:      UAASettings.ClientID,
 			ClientSecret:  UAASettings.ClientSecret,
 			Endpoint:      UAASettings.Endpoint,
