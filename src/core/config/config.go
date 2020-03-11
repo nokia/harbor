@@ -195,7 +195,8 @@ func WithSSO() (bool) {
 		return false
         }
 
-	if ( (cfgMgr.Get(common.AUTHMode).GetString()) == common.UAAAuth && len(os.Getenv("REALM"))>0 ) {
+	//if ( (cfgMgr.Get(common.AUTHMode).GetString()) == common.UAAAuth && len(os.Getenv("REALM"))>0 ) {
+	if ( len(os.Getenv("REALM"))>0 ) {
 		return true
 	} else {
 		return false
