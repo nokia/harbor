@@ -111,6 +111,11 @@ func fillEmailRealName(user *models.User) {
 	if len(user.Email) == 0 && strings.Contains(user.Username, "@") {
 		user.Email = user.Username
 	}
+
+        if len(user.Email) == 0 && len(user.SSORoleList) >0 {
+		user.Email = (user.Username + "@dummy.com")
+		log.Debugf("Add dummy mail %s", user.Email)
+        }
 }
 
 // PostAuthenticate will check if user exists in DB, if not on Board user, if he does, update the profile.
