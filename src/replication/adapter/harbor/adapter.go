@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"os"
 
 	common_http "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/http/modifier"
@@ -301,7 +302,8 @@ func (a *adapter) getRepositories(projectID int64) ([]*adp.Repository, error) {
 // when harbor is deployed on Kubernetes
 func (a *adapter) getURL() string {
 	if a.registry.Type == model.RegistryTypeHarbor && a.registry.Name == "Local" {
-		return "http://127.0.0.1:8080"
+		//return "http://127.0.0.1:8080"
+		return os.Getenv("CORE_LOCAL_URL")
 	}
 	return a.url
 }
